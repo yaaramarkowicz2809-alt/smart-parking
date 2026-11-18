@@ -1,0 +1,49 @@
+# Galactic Spaceport - Smart Parking (Track 2 - Full Stack)
+# Three microservices on one private network: web (nginx) -> api (flask) -> redis
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: parking-redis
+    # --appendonly yes : AOF persistence - every write is appended to a file on disk
+    # --appendfsync everysec : flush to disk once per second (good speed/safety balance)
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis-data:/data          # named volume -> data survives `docker compose down`
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    # No "ports:" on purpose - Redis is reachable only inside the Docker network
+
+  api:
+    build: ./api
+    image: smart-parking-api:local
+    container_name: parking-api
+    environment:
+      REDIS_HOST: redis           # the service name = DNS hostname inside the network
+      REDIS_PORT: "6379"
+      PARKING_CAPACITY: "10"
+      RATE_PER_HOUR: "12"
+      FREE_MINUTES: "15"
+    depends_on:
+      redis:
+        condition: service_healthy   # wait until redis answers PING, not just "started"
+    ports:
+      - "5000:5000"               # exposed so the IoT camera (scripts/camera.sh) can POST directly
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    image: smart-parking-web:local
+    container_name: parking-web
+    depends_on:
+      - api
+    ports:
+      - "8080:80"                 # host:container -> open http://localhost:8080
+    restart: unless-stopped
+
+volumes:
+  redis-data:                     # managed by Docker (docker volume ls)

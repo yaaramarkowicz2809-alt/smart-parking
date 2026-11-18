@@ -1,0 +1,5 @@
+# Keep Linux line endings for files that run inside Linux containers / bash
+*.sh   text eol=lf
+*.conf text eol=lf
+*.yml  text eol=lf
+Dockerfile text eol=lf

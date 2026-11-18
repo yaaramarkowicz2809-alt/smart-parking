@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🛸 Galactic Spaceport – לוח בקרה</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #ffffff; --text: #1b1f2a; --muted: #6b7280;
+    --accent: #5b5bd6; --ok: #16a34a; --warn: #f59e0b; --danger: #dc2626; --border: #e5e7eb;
+  }
+  body.dark {
+    --bg: #0b0e1a; --card: #151a2e; --text: #e8eaf6; --muted: #9aa3c0;
+    --accent: #8b8bff; --border: #262d4a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", Arial, sans-serif; background: var(--bg);
+         color: var(--text); transition: background .3s, color .3s; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px;
+           border-bottom: 1px solid var(--border); background: var(--card); }
+  h1 { margin: 0; font-size: 1.4rem; }
+  .sub { color: var(--muted); font-size: .85rem; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--card);
+           color: var(--text); padding: 8px 14px; border-radius: 8px; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .stat .label { color: var(--muted); font-size: .8rem; }
+  .stat .value { font-size: 1.6rem; font-weight: 700; margin-top: 4px; }
+  .bar { height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 8px; }
+  .bar > div { height: 100%; background: var(--ok); transition: width .4s, background .4s; }
+  #alert { display: none; margin: 16px 0; padding: 14px; border-radius: 10px; background: var(--danger);
+           color: #fff; font-weight: 700; text-align: center; animation: pulse 1s infinite alternate; }
+  @keyframes pulse { from { opacity: 1 } to { opacity: .6 } }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .panel h2 { margin: 0 0 12px; font-size: 1.05rem; }
+  .ship { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+          padding: 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+  .ship.new { animation: land .8s ease-out; }
+  @keyframes land { from { transform: translateY(-30px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .plate { font-family: monospace; font-size: 1.15rem; font-weight: 700; background: #facc15; color: #111;
+           padding: 2px 10px; border-radius: 4px; border: 2px solid #111; direction: ltr; display: inline-block; }
+  .meta { color: var(--muted); font-size: .82rem; margin-top: 4px; }
+  .msg { font-size: .85rem; margin-top: 4px; }
+  .fee { font-weight: 700; white-space: nowrap; }
+  .empty { color: var(--muted); text-align: center; padding: 30px; }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+          background: var(--bg); color: var(--text); direction: ltr; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111; color: #fff;
+           padding: 12px 20px; border-radius: 10px; opacity: 0; transition: opacity .3s; pointer-events: none; max-width: 90%; }
+  #toast.show { opacity: 1; }
+  ul.history { list-style: none; padding: 0; margin: 0; font-size: .85rem; }
+  ul.history li { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+  .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); }
+  .status-dot.down { background: var(--danger); }
+  body.hyperspace { animation: warp .15s linear infinite; }
+  @keyframes warp { 0% { filter: hue-rotate(0) } 100% { filter: hue-rotate(360deg) } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🛸 Galactic Spaceport</h1>
+    <div class="sub"><span id="dot" class="status-dot"></span> <span id="conn">מחובר</span> · מתעדכן אוטומטית כל 3 שניות</div>
+  </div>
+  <button id="themeBtn" title="Dark Mode">🌙 מצב לילה</button>
+</header>
+
+<main>
+  <div class="stats">
+    <div class="stat"><div class="label">ספינות בחניון</div><div class="value" id="count">–</div>
+      <div class="bar"><div id="bar" style="width:0%"></div></div></div>
+    <div class="stat"><div class="label">מקומות פנויים</div><div class="value" id="free">–</div></div>
+    <div class="stat"><div class="label">סה"כ כניסות</div><div class="value" id="total">–</div></div>
+    <div class="stat"><div class="label">הכנסות (קרדיטים)</div><div class="value" id="revenue">–</div></div>
+  </div>
+
+  <div id="alert">🚨 FULL CAPACITY – החניון מלא! הפנו ספינות לתחנת החלל הסמוכה 🚨</div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>ספינות עגונות כרגע</h2>
+      <div id="ships"><div class="empty">טוען...</div></div>
+    </section>
+
+    <aside>
+      <section class="panel">
+        <h2>📷 סימולטור מצלמה</h2>
+        <form id="camForm">
+          <input id="plateInput" placeholder="12-345-67" maxlength="12" required>
+          <button class="primary" type="submit">שלח</button>
+        </form>
+        <div class="meta" id="pricing"></div>
+      </section>
+      <section class="panel" style="margin-top:16px">
+        <h2>📜 יומן אירועים</h2>
+        <ul class="history" id="history"></ul>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+// ===== Config =====
+// Relative URL: the browser calls the same origin (Nginx), and Nginx proxies /api/ to the API container.
+const API = "/api";
+const POLL_MS = 3000;
+let knownPlates = new Set();   // to animate only newly-arrived ships
+
+// ===== Helpers =====
+const $ = (id) => document.getElementById(id);
+
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+function formatPlate(p) {   // 1234567 -> 12-345-67, 12345678 -> 123-45-678
+  return p.length === 7 ? `${p.slice(0,2)}-${p.slice(2,5)}-${p.slice(5)}`
+                        : `${p.slice(0,3)}-${p.slice(3,5)}-${p.slice(5)}`;
+}
+
+function el(tag, className, text) {   // build DOM safely (textContent, never innerHTML with data -> no XSS)
+  const e = document.createElement(tag);
+  if (className) e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+// ===== Render the parked ships (Dynamic DOM Manipulation) =====
+function renderShips(cars) {
+  const box = $("ships");
+  box.replaceChildren();
+  if (cars.length === 0) {
+    box.appendChild(el("div", "empty", "החניון ריק. השמיים פנויים 🌌"));
+    knownPlates = new Set();
+    return;
+  }
+  const current = new Set();
+  for (const car of cars) {
+    current.add(car.plate);
+    const row = el("div", "ship" + (knownPlates.has(car.plate) ? "" : " new"));
+
+    const info = el("div");
+    info.appendChild(el("span", "plate", formatPlate(car.plate)));
+    const time = new Date(car.entry_time * 1000).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+    info.appendChild(el("div", "meta", `🚀 ${car.ship_class} · נחת ב-${time} · ${car.minutes_parked} דק'`));
+    info.appendChild(el("div", "msg", car.message));
+
+    const right = el("div");
+    right.style.textAlign = "center";
+    right.appendChild(el("div", "fee", car.current_fee === 0 ? "חינם" : `${car.current_fee} ₡`));
+    const btn = el("button", "danger", "שחרור ספינה");
+    btn.onclick = () => releaseShip(car.plate);
+    right.appendChild(btn);
+
+    row.append(info, right);
+    box.appendChild(row);
+  }
+  knownPlates = current;
+}
+
+function renderStats(d) {
+  $("count").textContent = `${d.count}/${d.capacity}`;
+  $("free").textContent = d.free;
+  $("total").textContent = d.total_entries;
+  $("revenue").textContent = d.revenue.toFixed(0);
+  const pct = Math.round((d.count / d.capacity) * 100);
+  const bar = $("bar");
+  bar.style.width = pct + "%";
+  bar.style.background = pct >= 100 ? "var(--danger)" : pct >= 70 ? "var(--warn)" : "var(--ok)";
+  $("alert").style.display = d.full ? "block" : "none";
+  $("pricing").textContent = `תעריף: ${d.free_minutes} דק' ראשונות חינם, אחר כך ${d.rate_per_hour} ₡ לכל שעה שהתחילה`;
+}
+
+function renderHistory(events) {
+  const ul = $("history");
+  ul.replaceChildren();
+  for (const e of events) {
+    const t = new Date(e.time * 1000).toLocaleTimeString("he-IL");
+    const text = e.type === "entry"
+      ? `🟢 ${t} – ${formatPlate(e.plate)} נחת`
+      : `🔴 ${t} – ${formatPlate(e.plate)} המריא (${e.fee} ₡)`;
+    ul.appendChild(el("li", "", text));
+  }
+}
+
+function setConnection(ok) {
+  $("dot").classList.toggle("down", !ok);
+  $("conn").textContent = ok ? "מחובר" : "אין חיבור לשרת ה-API";
+}
+
+// ===== Network calls (fetch) =====
+async function refresh() {
+  try {
+    const [carsRes, histRes] = await Promise.all([fetch(`${API}/cars`), fetch(`${API}/history`)]);
+    if (!carsRes.ok) throw new Error(carsRes.status);
+    const data = await carsRes.json();
+    renderStats(data);
+    renderShips(data.cars);
+    if (histRes.ok) renderHistory((await histRes.json()).events);
+    setConnection(true);
+  } catch (err) {
+    setConnection(false);
+  }
+}
+
+async function releaseShip(plate) {
+  const res = await fetch(`${API}/exit/${plate}`, { method: "POST" });
+  const data = await res.json();
+  toast(res.ok ? `🛫 ${formatPlate(plate)} המריא אחרי ${data.minutes} דק'. לתשלום: ${data.fee} ₡` : `⚠️ ${data.error}`);
+  refresh();
+}
+
+// Simulates the IoT camera: same POST the real camera sends
+$("camForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const plate = $("plateInput").value;
+  const res = await fetch(`${API}/entry`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plate }),
+  });
+  const data = await res.json();
+  toast(res.ok ? data.car.message : `⚠️ ${data.error}`);
+  if (res.ok) $("plateInput").value = "";
+  refresh();
+});
+
+// ===== Dark mode (remembered in localStorage) =====
+function applyTheme(dark) {
+  document.body.classList.toggle("dark", dark);
+  $("themeBtn").textContent = dark ? "☀️ מצב יום" : "🌙 מצב לילה";
+}
+let dark = false;
+try { dark = localStorage.getItem("theme") === "dark"; } catch (_) {}
+applyTheme(dark);
+$("themeBtn").onclick = () => {
+  dark = !dark;
+  applyTheme(dark);
+  try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (_) {}
+};
+
+// ===== Easter egg: Konami code -> HYPERSPACE =====
+const KONAMI = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+let pos = 0;
+document.addEventListener("keydown", (e) => {
+  pos = e.key === KONAMI[pos] ? pos + 1 : (e.key === KONAMI[0] ? 1 : 0);
+  if (pos === KONAMI.length) {
+    pos = 0;
+    document.body.classList.add("hyperspace");
+    toast("🌀 קפיצה להיפר-חלל!");
+    setTimeout(() => document.body.classList.remove("hyperspace"), 3000);
+  }
+});
+
+// ===== Start polling =====
+refresh();
+setInterval(refresh, POLL_MS);
+</script>
+</body>
+</html>
